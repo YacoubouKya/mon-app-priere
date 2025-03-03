@@ -1,0 +1,15 @@
+credentials:
+  usernames:
+    admin:
+      email: admin@example.com
+      name: Administrateur
+      password: $2b$12$vogXO7iVxNjMvxiT5N9evuponRuIg5kjCaj40qw33JDVAbNO.0Zce  # Remplacez par votre hash
+    utilisateur:
+      email: user@example.com
+      name: Utilisateur Standard
+      password: $2b$12$zsEDLV7ObbWbBHDCx0LBbORCHlkfmabU69DC2JHEC8xxpSKiGeqMu  # Remplacez par votre hash
+
+cookie:
+  expiry_days: 1
+  key: votre_cle_secrete_unic0de_123!  # Changer cette valeur
+  name: prayer_app_cookie
