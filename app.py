@@ -3,77 +3,23 @@ import yaml
 import requests
 import streamlit_authenticator as stauth
 from geopy.geocoders import Nominatim
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
+from streamlit_autorefresh import st_autorefresh
+
+# -------------------- CONFIGURATION --------------------
 
 # Configuration de la page
 st.set_page_config(
     page_title="Masjid Nima Bernard-Kopé - Horaires de Prière",
     page_icon="🕌",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="centered"
 )
 
-# Style CSS personnalisé
-st.markdown("""
-<style>
-:root {
-    --primary-color: #2A5F7F;
-    --secondary-color: #DAA520;
-    --background-color: #F8F9FA;
-}
-
-.header {
-    background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
-                url('https://th.bing.com/th/id/OIP.rqHaFqlRNxnFnrAHD6YC3QHaE8?rs=1&pid=ImgDetMain');
-    background-size: cover;
-    color: white;
-    padding: 4rem 2rem;
-    border-radius: 15px;
-    margin-bottom: 2rem;
-    text-align: center;
-}
-
-.prayer-card {
-    background: white;
-    border-radius: 15px;
-    padding: 1.5rem;
-    margin: 1rem;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: transform 0.3s ease;
-    border-left: 5px solid var(--primary-color);
-}
-
-.prayer-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 12px rgba(0,0,0,0.15);
-}
-
-.prayer-time {
-    font-size: 1.8rem;
-    color: var(--primary-color);
-    font-weight: 700;
-}
-
-.prayer-name {
-    color: var(--secondary-color);
-    font-size: 1.2rem;
-    text-transform: uppercase;
-}
-
-.location-card {
-    background: white;
-    padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Chargement de la configuration
+# Charger la configuration de l'authentification
 with open('config.yaml') as file:
     config = yaml.safe_load(file)
 
-# Initialisation de l'authentification
 authenticator = stauth.Authenticate(
     config['credentials'],
     config['cookie']['name'],
@@ -101,129 +47,187 @@ except TypeError:
 
 # Gestion des états d'authentification
 if authentication_status:
+    # --- Partie connectée ---
     st.sidebar.success(f"✅ Connecté en tant que {name}")
     authenticator.logout("Se déconnecter", "sidebar")
 
-    # En-tête
-    st.markdown(f"""
-    <div class="header">
-        <h1 style="font-size: 2.5rem;">🕌 Masjid Nima Bernard-Kopé</h1>
-        <h3>Horaires des prières - {datetime.now().strftime("%d %B %Y")}</h3>
-    </div>
+      # Ajout d'un style CSS personnalisé
+    st.markdown("""
+    <style>
+    .prayer-card {
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-radius: 15px;
+        background: #ffffff;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    .prayer-card:hover {
+        transform: translateY(-5px);
+    }
+    .prayer-time {
+        font-size: 1.4rem;
+        color: #2c3e50;
+        font-weight: bold;
+    }
+    </style>
     """, unsafe_allow_html=True)
 
-    # Section localisation
-    with st.container():
-        st.markdown("""
-        <div class="location-card">
-            <h2 style="color: var(--primary-color);">📍 Configuration de la localisation</h2>
-        """, unsafe_allow_html=True)
-        
-        location_method = st.radio(
-            "Méthode de sélection :",
-            ["🌍 Géolocalisation automatique", "✍️ Entrée manuelle"],
-            horizontal=True
-        )
-        
-        city, country = "Lomé", "Togo"
-        
-        if location_method == "🌍 Géolocalisation automatique":
-            col1, col2 = st.columns(2)
-            lat = col1.number_input("Latitude", value=6.17249, format="%.5f")
-            lon = col2.number_input("Longitude", value=1.23136, format="%.5f")
-            
-            try:
-                geolocator = Nominatim(user_agent="prayer_times_app")
-                location = geolocator.reverse((lat, lon), exactly_one=True, language='fr')
-                if location:
-                    address = location.raw.get('address', {})
-                    city = address.get('city', 'Lomé')
-                    country = address.get('country', 'Togo')
-            except Exception as e:
-                st.error(f"Erreur de géolocalisation : {str(e)}")
-        else:
-            city = st.text_input("Ville", "Lomé")
-            country = st.text_input("Pays", "Togo")
 
-    # Récupération des horaires
+
+
+# -------------------- CONFIGURATION DES HORAIRES --------------------
+
+# Paramètres par défaut pour l'Iqama et les rappels
+if 'iqama_offsets' not in st.session_state:
+    st.session_state.iqama_offsets = {"Fajr": 10, "Dhuhr": 5, "Asr": 5, "Maghrib": 5, "Isha": 10}
+
+if 'reminder_settings' not in st.session_state:
+    st.session_state.reminder_settings = {"Fajr": 15, "Dhuhr": 10, "Asr": 10, "Maghrib": 10, "Isha": 15}
+
+# Liens audio pour Adhan et rappels
+ADHAN_SOUND = "https://cdn.pixabay.com/download/audio/2021/08/04/audio_23d5f5d2f8.mp3"
+REMINDER_SOUND = "https://cdn.pixabay.com/download/audio/2022/03/15/audio_d1715f6d94.mp3"
+
+# Fonction pour jouer un son
+def play_sound(url):
+    st.audio(url, format="audio/mp3")
+
+# Fonction pour récupérer les horaires de prière via API
+@st.cache_data(ttl=3600)  # Cache des données pendant 1h
+def get_prayer_times(city, country):
     try:
         response = requests.get(
             f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method=2",
             timeout=10
         )
-        prayer_times = response.json()["data"]["timings"] if response.ok else None
-    except Exception as e:
-        st.error(f"Erreur API : {str(e)}")
-        prayer_times = None
+        if response.ok:
+            return response.json()["data"]["timings"]
+    except requests.RequestException as e:
+        st.error(f"Erreur API : {e}")
+    return None
 
-    # Affichage des horaires
-    if prayer_times:
-        st.markdown(f"""
-        <div style="margin-top: 2rem;">
-            <h2 style="color: var(--primary-color);">⏰ Horaires pour {city}, {country}</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-        """, unsafe_allow_html=True)
-        
-        prayers = {
-            "Fajr": "🌅", 
-            "Dhuhr": "☀️", 
-            "Asr": "⛅", 
-            "Maghrib": "🌇", 
-            "Isha": "🌙"
-        }
-        
-        cols = st.columns(2)
-        for i, (prayer, emoji) in enumerate(prayers.items()):
-            with cols[i % 2]:
-                st.markdown(f"""
-                <div class="prayer-card">
-                    <div class="prayer-name">{emoji} {prayer}</div>
-                    <div class="prayer-time">{prayer_times.get(prayer, 'N/A')}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Section complémentaire
+# 🔹 Variables de localisation
+city = "Lomé"
+country = "Togo"
+
+# 🔹 Fonction pour récupérer la date islamique
+def get_islamic_date():
+    try:
+        today = datetime.today().strftime('%d-%m-%Y')
+        response = requests.get(f"http://api.aladhan.com/v1/gToH?date={today}", timeout=10)
+        if response.ok:
+            hijri_date = response.json()["data"]["hijri"]
+            return f"{hijri_date['day']} {hijri_date['month']['en']} {hijri_date['year']}H"
+    except Exception as e:
+        st.error(f"Erreur lors de la récupération de la date islamique : {str(e)}")
+        return "Date islamique inconnue"
+
+# 🔹 Récupération des dates
+hijri_date = get_islamic_date()
+gregorian_date = datetime.today().strftime('%d %B %Y')
+
+# 🔹 Affichage du titre avec l’image de fond
+st.markdown(f"""
+    <style>
+        .title-container {{
+            text-align: center;
+            padding: 50px 0;
+            background: url('https://upload.wikimedia.org/wikipedia/commons/7/73/Hassan_II_Mosque.jpg');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            font-weight: bold;
+            border-radius: 15px;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.3);
+        }}
+        .title-container h1 {{
+            font-size: 2.5rem;
+            margin-bottom: 5px;
+        }}
+        .title-container h2 {{
+            font-size: 1.5rem;
+            margin-top: 0;
+        }}
+    </style>
+    <div class="title-container">
+        <h1>🕌 Masjid Nima Bernard-Kopé - Horaires de Prière</h1>
+        <h2>{city}, {country} - {gregorian_date} | {hijri_date}</h2>
+    </div>
+""", unsafe_allow_html=True)
+
+# -------------------- INTERFACE PRINCIPALE --------------------
+if authentication_status:
+    st.sidebar.success(f"✅ Connecté en tant que {name}")
+    authenticator.logout("Se déconnecter", "sidebar", key="logout_button")
+
+    # Admin : Configuration des horaires Iqama et rappels
+    if username == "admin":
+        with st.sidebar.expander("⚙ Configuration"):
+            st.write("*Décalages Iqama (minutes):*")
+            for prayer in st.session_state.iqama_offsets:
+                st.session_state.iqama_offsets[prayer] = st.number_input(
+                    prayer, 0, 60, st.session_state.iqama_offsets[prayer], key=f"iqama_{prayer}")
+
+            st.write("*Rappels (minutes avant):*")
+            for prayer in st.session_state.reminder_settings:
+                st.session_state.reminder_settings[prayer] = st.number_input(
+                    prayer, 0, 60, st.session_state.reminder_settings[prayer], key=f"reminder_{prayer}")
+
+    # Localisation
+    with st.container():
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("""
-            <div style="margin-top: 2rem;">
-                <h3 style="color: var(--primary-color);">📅 Calendrier mensuel</h3>
-                <img src="https://via.placeholder.com/600x200?text=Calendrier+des+prières" 
-                    style="width: 100%; border-radius: 10px;">
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div style="margin-top: 2rem;">
-                <h3 style="color: var(--primary-color);">📚 Rappels importants</h3>
-                <ul style="color: var(--primary-color);">
-                    <li>Arriver 10 minutes avant l'iqama</li>
-                    <li>Prévoir son tapis de prière</li>
-                    <li>Respect des mesures sanitaires</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            location_method = st.radio("Méthode:", ["📍 GPS", "🌍 Manuel"])
+
+        city, country = "Lomé", "Togo"
+
+        if location_method == "📍 GPS":
+            lat = col2.number_input("Latitude", 6.17249, format="%.5f")
+            lon = col2.number_input("Longitude", 1.23136, format="%.5f")
+            try:
+                geolocator = Nominatim(user_agent="prayer_app")
+                location = geolocator.reverse((lat, lon), language='fr')
+                if location:
+                    address = location.raw.get('address', {})
+                    city = address.get('city', 'Lomé')
+                    country = address.get('country', 'Togo')
+            except Exception as e:
+                st.error(f"Erreur géolocalisation : {e}")
+        else:
+            city = st.text_input("Ville", "Lomé")
+            country = st.text_input("Pays", "Togo")
+
+    # Récupération des horaires
+    prayer_times = get_prayer_times(city, country)
+    if prayer_times:
+        # Rafraîchissement automatique toutes les 60 secondes
+        st_autorefresh(interval=60*1000, key="prayer_times_refresh")
+
+        st.markdown('<div class="main-container">', unsafe_allow_html=True)
+
+        # Affichage des horaires
+        cols = st.columns(2)
+        for idx, prayer in enumerate(["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]):
+            with cols[idx % 2]:
+                prayer_time = prayer_times[prayer]
+                iqama_time = datetime.strptime(prayer_time, "%H:%M") + timedelta(minutes=st.session_state.iqama_offsets[prayer])
+
+                st.markdown(f"""
+                <div class="prayer-card">
+                    <h3>{prayer}</h3>
+                    <p style="font-size:1.5rem; margin:0.5rem 0;">{prayer_time} ⏳ +{st.session_state.iqama_offsets[prayer]} min</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    else:
+        st.error("Les horaires de prière ne sont pas disponibles.")
 
 elif authentication_status is False:
-    st.sidebar.error("❌ Identifiants incorrects")
-    st.title("Bienvenue")
-    st.markdown("""
-    <div style="text-align: center; margin-top: 50px;">
-        <h3>Veuillez vous connecter</h3>
-        <p>Utilisez le formulaire dans la barre latérale →</p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.error("Identifiants incorrects.")
 elif authentication_status is None:
-    st.title("Bienvenue")
-    st.markdown("""
-    <div style="text-align: center; margin-top: 50px;">
-        <h3>Veuillez vous connecter</h3>
-        <p>Utilisez le formulaire dans la barre latérale →</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Pied de page
+    st.warning("Veuillez vous connecter.")
 st.markdown("---")
-st.caption("Développé par Yacoubou KOUMAI - © 2024")
+st.caption("Développé par Yacoubou KOUMAI - © 2024 | v1.0.0")
