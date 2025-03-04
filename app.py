@@ -1,11 +1,11 @@
 import streamlit as st
-import yaml
 import requests
 import streamlit_authenticator as stauth
 from geopy.geocoders import Nominatim
 from datetime import datetime, timedelta
 import pytz
 from streamlit_autorefresh import st_autorefresh
+import yaml
 
 # -------------------- CONFIGURATION --------------------
 
