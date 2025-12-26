@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import streamlit_authenticator as stauth
+import streamlit-authenticator as stauth
 from geopy.geocoders import Nominatim
 from datetime import datetime, timedelta
 import pytz
@@ -231,3 +231,4 @@ elif authentication_status is None:
     st.warning("Veuillez vous connecter.")
 st.markdown("---")
 st.caption("Développé par Yacoubou KOUMAI - © 2024 | v1.0.0")
+
