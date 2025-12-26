@@ -1,7 +1,7 @@
 streamlit==1.32.2
 requests==2.31.0
 geopy==2.4.1
-streamlit-authenticator==0.2.3
+streamlit-authenticator
 PyYAML==6.0.1
 python-dotenv==1.0.0
 pygame==2.5.0
@@ -9,5 +9,6 @@ pytz==2024.1
 python-dateutil==2.8.2
 streamlit-autorefresh
 PyYAML
+
 
 
