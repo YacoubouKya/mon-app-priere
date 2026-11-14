@@ -20,7 +20,7 @@ from streamlit_autorefresh import st_autorefresh
 # ---------------------------------------------------------------------------
 
 MOSQUE_NAME = "Masjid Nima Bernard-Kopé"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 DEFAULT_CITY = "Lomé"
 DEFAULT_COUNTRY = "Togo"
 DEFAULT_LAT, DEFAULT_LON = 6.17249, 1.23136
@@ -52,12 +52,15 @@ st.set_page_config(page_title=f"{MOSQUE_NAME} - Horaires de prière", layout="ce
 # ---------------------------------------------------------------------------
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_prayer_data(city: str, country: str) -> dict | None:
-    """Récupère les horaires, les dates et le fuseau horaire de la ville."""
+def get_prayer_data(city: str, country: str, method: int = CALCULATION_METHOD) -> dict | None:
+    """Récupère les horaires, les dates et le fuseau horaire de la ville.
+
+    La méthode de calcul fait partie des arguments : elle entre dans la clé du cache.
+    """
     try:
         response = requests.get(
             ALADHAN_URL,
-            params={"city": city, "country": country, "method": CALCULATION_METHOD},
+            params={"city": city, "country": country, "method": method},
             timeout=10,
         )
         response.raise_for_status()
@@ -234,7 +237,7 @@ def render_prayer_times(timings: dict, upcoming: str) -> None:
 def main() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
     city, country = select_location()
-    data = get_prayer_data(city, country)
+    data = get_prayer_data(city, country, CALCULATION_METHOD)
 
     if data is None:
         render_header(city, country, None, None)
