@@ -9,7 +9,9 @@ de chaque prière.
 - Horaires du jour (Fajr, Dhuhr, Asr, Maghrib, Isha) issus de l'API publique
   [Aladhan](https://aladhan.com/prayer-times-api), méthode de calcul ISNA.
 - Heure de l'Iqama calculée à partir d'un décalage fixe par prière.
-- Date grégorienne et date hégirienne du jour.
+- Prochaine prière mise en évidence, avec le temps restant (heure locale de la ville).
+- Date grégorienne et date hégirienne du jour, en français.
+- Couleurs fixes pour chaque bloc : affichage lisible en thème clair comme en thème sombre.
 - Choix du lieu dans le panneau latéral : saisie de la ville et du pays, ou coordonnées
   GPS (géocodage inverse via OpenStreetMap) ; Lomé par défaut.
 - Actualisation automatique de la page chaque minute.
