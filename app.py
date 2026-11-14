@@ -1,22 +1,16 @@
 """Horaires de prière - Masjid Nima Bernard-Kopé (Lomé, Togo).
 
-Application Streamlit qui affiche les horaires des cinq prières du jour
+Application Streamlit publique qui affiche les horaires des cinq prières du jour
 (source : API Aladhan) avec l'heure de l'Iqama de chaque prière.
-L'accès est protégé par une authentification ; le compte administrateur
-peut ajuster les décalages d'Iqama.
+Les décalages d'Iqama se règlent dans IQAMA_OFFSETS.
 """
 
 from __future__ import annotations
 
-import copy
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any
 
 import requests
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
 from geopy.geocoders import Nominatim
 from streamlit_autorefresh import st_autorefresh
 
@@ -25,63 +19,20 @@ from streamlit_autorefresh import st_autorefresh
 # ---------------------------------------------------------------------------
 
 APP_TITLE = "Masjid Nima Bernard-Kopé - Horaires de prière"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 DEFAULT_CITY = "Lomé"
 DEFAULT_COUNTRY = "Togo"
 DEFAULT_LAT, DEFAULT_LON = 6.17249, 1.23136
-ADMIN_USERNAME = "admin"
 
 PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
-DEFAULT_IQAMA_OFFSETS = {"Fajr": 10, "Dhuhr": 5, "Asr": 5, "Maghrib": 5, "Isha": 10}
+# Minutes entre l'appel à la prière (Adhan) et l'Iqama
+IQAMA_OFFSETS = {"Fajr": 10, "Dhuhr": 5, "Asr": 5, "Maghrib": 5, "Isha": 10}
 
 ALADHAN_URL = "https://api.aladhan.com/v1/timingsByCity"
 CALCULATION_METHOD = 2  # Islamic Society of North America (ISNA)
 REFRESH_INTERVAL_MS = 60 * 1000
-LOCAL_CONFIG_FILE = Path(__file__).parent / "config.yaml"
 
 st.set_page_config(page_title=APP_TITLE, layout="centered")
-
-
-# ---------------------------------------------------------------------------
-# Authentification
-# ---------------------------------------------------------------------------
-
-def _to_dict(obj: Any) -> Any:
-    """Convertit récursivement un objet st.secrets en dict modifiable."""
-    if hasattr(obj, "items"):
-        return {key: _to_dict(value) for key, value in obj.items()}
-    return copy.deepcopy(obj)
-
-
-def load_auth_config() -> dict | None:
-    """Charge les identifiants depuis st.secrets (déploiement) ou config.yaml (local).
-
-    Aucun identifiant n'est stocké dans le dépôt : voir README, section
-    "Configuration de l'authentification".
-    """
-    try:
-        if "credentials" in st.secrets and "cookie" in st.secrets:
-            return {
-                "credentials": _to_dict(st.secrets["credentials"]),
-                "cookie": _to_dict(st.secrets["cookie"]),
-            }
-    except FileNotFoundError:
-        pass  # pas de secrets.toml en local
-
-    if LOCAL_CONFIG_FILE.exists():
-        with LOCAL_CONFIG_FILE.open(encoding="utf-8") as file:
-            return yaml.safe_load(file)
-    return None
-
-
-def build_authenticator(config: dict) -> stauth.Authenticate:
-    cookie = config["cookie"]
-    return stauth.Authenticate(
-        config["credentials"],
-        cookie["name"],
-        cookie["key"],
-        cookie["expiry_days"],
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -179,20 +130,11 @@ def render_header(city: str, country: str, data: dict | None) -> None:
     )
 
 
-def render_admin_settings() -> None:
-    with st.sidebar.expander("Configuration de l'Iqama"):
-        st.caption("Décalage entre l'appel à la prière et l'Iqama (minutes)")
-        for prayer in PRAYERS:
-            st.session_state.iqama_offsets[prayer] = st.number_input(
-                prayer, 0, 60, st.session_state.iqama_offsets[prayer], key=f"iqama_{prayer}"
-            )
-
-
 def select_location() -> tuple[str, str]:
-    col1, col2 = st.columns(2)
-    with col1:
-        method = st.radio("Localisation", ["Coordonnées GPS", "Saisie manuelle"])
-    with col2:
+    """Choix du lieu dans le panneau latéral (Lomé par défaut)."""
+    with st.sidebar:
+        st.header("Lieu")
+        method = st.radio("Localisation", ["Saisie manuelle", "Coordonnées GPS"])
         if method == "Coordonnées GPS":
             lat = st.number_input("Latitude", value=DEFAULT_LAT, format="%.5f")
             lon = st.number_input("Longitude", value=DEFAULT_LON, format="%.5f")
@@ -210,7 +152,7 @@ def render_prayer_times(timings: dict) -> None:
     cols = st.columns(2)
     for idx, prayer in enumerate(PRAYERS):
         prayer_time = timings[prayer][:5]
-        offset = st.session_state.iqama_offsets[prayer]
+        offset = IQAMA_OFFSETS[prayer]
         with cols[idx % 2]:
             st.markdown(
                 f"""
@@ -226,43 +168,6 @@ def render_prayer_times(timings: dict) -> None:
 
 def main() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
-
-    if "iqama_offsets" not in st.session_state:
-        st.session_state.iqama_offsets = dict(DEFAULT_IQAMA_OFFSETS)
-
-    config = load_auth_config()
-    if config is None:
-        render_header(DEFAULT_CITY, DEFAULT_COUNTRY, None)
-        st.error(
-            "Configuration d'authentification absente. Ajoutez les identifiants dans "
-            "les secrets Streamlit ou dans un fichier config.yaml (voir README)."
-        )
-        return
-
-    authenticator = build_authenticator(config)
-    authenticator.login(
-        location="sidebar",
-        fields={
-            "Form name": "Connexion",
-            "Username": "Identifiant",
-            "Password": "Mot de passe",
-            "Login": "Se connecter",
-        },
-    )
-    status = st.session_state.get("authentication_status")
-
-    if not status:
-        render_header(DEFAULT_CITY, DEFAULT_COUNTRY, None)
-        if status is False:
-            st.error("Identifiants incorrects.")
-        else:
-            st.info("Veuillez vous connecter depuis le panneau latéral.")
-        return
-
-    st.sidebar.success(f"Connecté en tant que {st.session_state.get('name')}")
-    authenticator.logout("Se déconnecter", "sidebar")
-    if st.session_state.get("username") == ADMIN_USERNAME:
-        render_admin_settings()
 
     city, country = select_location()
     data = get_prayer_data(city, country)
