@@ -1,0 +1,8 @@
+# Identifiants : ne jamais versionner
+config.yaml
+.streamlit/secrets.toml
+
+__pycache__/
+*.pyc
+.venv/
+venv/

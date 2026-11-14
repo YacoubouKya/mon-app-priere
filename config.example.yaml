@@ -1,0 +1,17 @@
+# Copier ce fichier en config.yaml (ignore par git) pour un usage local.
+# Les mots de passe sont des hashes bcrypt : python scripts/hash_password.py
+credentials:
+  usernames:
+    admin:
+      email: admin@example.com
+      name: Administrateur
+      password: "<hash bcrypt>"
+    utilisateur:
+      email: user@example.com
+      name: Utilisateur
+      password: "<hash bcrypt>"
+
+cookie:
+  name: prayer_app_cookie
+  key: "<chaine aleatoire longue>"
+  expiry_days: 1
