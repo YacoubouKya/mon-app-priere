@@ -7,7 +7,7 @@ de chaque prière.
 ## Fonctionnalités
 
 - Horaires du jour (Fajr, Dhuhr, Asr, Maghrib, Isha) issus de l'API publique
-  [Aladhan](https://aladhan.com/prayer-times-api), méthode de calcul ISNA.
+  [Aladhan](https://aladhan.com/prayer-times-api), méthode de calcul de la Ligue islamique mondiale (`CALCULATION_METHOD` dans `app.py`).
 - Heure de l'Iqama calculée à partir d'un décalage fixe par prière.
 - Prochaine prière mise en évidence, avec le temps restant (heure locale de la ville).
 - Date grégorienne et date hégirienne du jour, en français.

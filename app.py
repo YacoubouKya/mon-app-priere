@@ -20,7 +20,7 @@ from streamlit_autorefresh import st_autorefresh
 # ---------------------------------------------------------------------------
 
 MOSQUE_NAME = "Masjid Nima Bernard-Kopé"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 DEFAULT_CITY = "Lomé"
 DEFAULT_COUNTRY = "Togo"
 DEFAULT_LAT, DEFAULT_LON = 6.17249, 1.23136
@@ -30,7 +30,7 @@ PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]
 IQAMA_OFFSETS = {"Fajr": 10, "Dhuhr": 5, "Asr": 5, "Maghrib": 5, "Isha": 10}
 
 ALADHAN_URL = "https://api.aladhan.com/v1/timingsByCity"
-CALCULATION_METHOD = 2  # Islamic Society of North America (ISNA)
+CALCULATION_METHOD = 3  # Ligue islamique mondiale (Muslim World League)
 REFRESH_INTERVAL_MS = 60 * 1000
 
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
